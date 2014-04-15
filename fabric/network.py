@@ -365,6 +365,31 @@ def normalize_to_string(host_string):
     return join_host_strings(*normalize(host_string))
 
 
+def get_gssapi_config(host):
+    """
+    Returns GSSAPI related SSH configuration values.
+    """
+
+    conf = ssh_config(host)
+
+    # These could be enabled by default since this is fairly safe.
+    gss_auth = True
+    gss_kex = True
+
+    # Credentials delegation is unsafe, disable by default.
+    gss_deleg_creds = False
+
+    # Gather the user's configuration.
+    if 'gssapiauthentication' in conf:
+        gss_auth = conf['gssapiauthentication']
+    if 'gssapikeyexchange' in conf:
+        gss_kex = conf['gssapikeyexchange']
+    if 'gssapidelegatecredentials' in conf:
+        gss_deleg_creds = conf['gssapidelegatecredentials']
+
+    return (gss_auth, gss_kex, gss_deleg_creds)
+
+
 def connect(user, host, port, cache, seek_gateway=True):
     """
     Create and return a new SSHClient instance connected to given host.
@@ -404,6 +429,8 @@ def connect(user, host, port, cache, seek_gateway=True):
     if not env.reject_unknown_hosts:
         client.set_missing_host_key_policy(ssh.AutoAddPolicy())
 
+    (gss_auth, gss_kex, gss_deleg_creds) = get_gssapi_config(host)
+
     #
     # Connection attempt loop
     #
@@ -436,7 +463,10 @@ def connect(user, host, port, cache, seek_gateway=True):
                 timeout=env.timeout,
                 allow_agent=not env.no_agent,
                 look_for_keys=not env.no_keys,
-                sock=sock
+                sock=sock,
+                gss_auth=gss_auth,
+                gss_kex=gss_kex,
+                gss_deleg_creds=gss_deleg_creds
             )
             connected = True
 
